@@ -445,13 +445,23 @@ const AvatarPlayer = (function () {
             loader.load(
                 url,
                 (gltf) => {
+                    avatarRoot = gltf.scene;
                     scene.add(gltf.scene);
                     gltfAnimations = gltf.animations || [];
                     mixer = new THREE.AnimationMixer(gltf.scene);
                     mixer.addEventListener('finished', () => {
+                        const finishedAction = currentAction;
                         if (onFinishedCallback) onFinishedCallback();
+                        if (currentAction === finishedAction && finishedAction) {
+                            finishedAction.stop();
+                            currentAction = null;
+                            applyRestPose();
+                        }
                     });
                     ready = true;
+
+                    captureRestPose();
+                    applyRestPose();
 
                     // Adjust sizing once model is mounted
                     onResize();
