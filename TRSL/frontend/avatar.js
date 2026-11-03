@@ -194,6 +194,7 @@ const SIGN_ANIMATIONS = {
     'shampanye': 'shampanye',
 
     // Household & Objects
+     // Household & Objects
     'ibikoresho': 'ibikoresho',
     'byo mu rugo': 'byo mu rugo',
     'ibikoresho byo mu rugo': 'ibikoresho byo mu rugo',
