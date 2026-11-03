@@ -322,6 +322,48 @@ const AvatarPlayer = (function () {
     let pendingWord = null;
     let gltfAnimations = [];
     let playbackSpeed = 1;
+    let avatarRoot = null;
+    const armRests = [];
+    const DOWN = new THREE.Vector3(0, -1, 0);
+
+    function captureRestPose() {
+        armRests.length = 0;
+        if (!avatarRoot) return;
+        ['LeftArm', 'RightArm'].forEach((name) => {
+            const bone = avatarRoot.getObjectByName(name);
+            if (!bone) return;
+            const child = bone.children.find(c => /ForeArm/i.test(c.name || '')) || bone.children[0];
+            if (!child) return;
+            armRests.push({
+                bone,
+                offset: child.position.clone(),
+                local: bone.quaternion.clone()
+            });
+        });
+    }
+
+    function applyRestPose() {
+        if (!avatarRoot || !armRests.length) return;
+        avatarRoot.updateMatrixWorld(true);
+        const parentWorld = new THREE.Quaternion();
+        const boneWorld = new THREE.Quaternion();
+        const dir = new THREE.Vector3();
+        const delta = new THREE.Quaternion();
+        armRests.forEach((arm) => {
+            arm.bone.quaternion.copy(arm.local);
+            arm.bone.updateMatrixWorld(true);
+            arm.bone.getWorldQuaternion(boneWorld);
+            dir.copy(arm.offset).applyQuaternion(boneWorld).normalize();
+            delta.setFromUnitVectors(dir, DOWN);
+            arm.bone.parent.getWorldQuaternion(parentWorld);
+            const newLocal = parentWorld.clone().invert()
+                .multiply(delta)
+                .multiply(parentWorld)
+                .multiply(arm.local);
+            arm.bone.quaternion.copy(newLocal);
+            arm.bone.updateMatrixWorld(true);
+        });
+    }
 
     function normalize(word) {
         return (word || '').trim().toLowerCase().replace(/[’‘`]/g, "'");
@@ -354,8 +396,8 @@ const AvatarPlayer = (function () {
             0.1,
             100
         );
-        camera.position.set(0, 1.4, 2.3);
-        camera.lookAt(0, 1.25, 0);
+        camera.position.set(0, 1.4, 1.8);
+        camera.lookAt(0, 1.28, 0);
 
         try {
             renderer = new THREE.WebGLRenderer({
@@ -395,6 +437,9 @@ const AvatarPlayer = (function () {
         scene.add(dir);
 
         const loader = new THREE.GLTFLoader();
+        if (typeof MeshoptDecoder !== 'undefined') {
+            loader.setMeshoptDecoder(MeshoptDecoder);
+        }
 
         const loadWithFallback = (url, isRetry = false) => {
             loader.load(

@@ -49,31 +49,18 @@
             width: 0 !important;
             min-width: 0 !important;
             max-width: 0 !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            max-height: 0 !important;
             overflow: hidden !important;
             border-right: none !important;
+            border-bottom: none !important;
             padding: 0 !important;
             box-shadow: none !important;
         }
 
         .sidebar-collapsed main {
             margin-left: 0;
-        }
-
-        /* ── Main body shadow overlay when sidebar is open ── */
-        #mainOverlayShadow {
-            position: absolute;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(1px);
-            z-index: 25;
-            opacity: 1;
-            pointer-events: auto;
-            transition: opacity 0.3s cubic-bezier(0.2, 0.9, 0.4, 1.1);
-        }
-
-        .sidebar-collapsed #mainOverlayShadow {
-            opacity: 0 !important;
-            pointer-events: none !important;
         }
 
         .chat-card {
@@ -182,12 +169,12 @@
         }
     </style>
 </head>
-<body class="bg-surface text-gray-200 antialiased h-screen flex overflow-hidden sidebar-collapsed">
+<body class="bg-surface text-gray-200 antialiased h-screen flex flex-col md:flex-row overflow-hidden">
 
     <div class="fixed inset-0 pointer-events-none opacity-10 z-0" style="background-image: radial-gradient(#3b82f6 0.5px, transparent 0.5px); background-size: 32px 32px;"></div>
 
     <!-- SIDEBAR -->
-    <aside id="mainSidebar" class="w-full max-w-[85vw] sm:max-w-[320px] md:w-80 bg-[#161b26] border-r border-slate-700/70 flex flex-col h-full z-30 shrink-0 shadow-2xl">
+    <aside id="mainSidebar" class="w-full md:w-80 max-h-[45vh] md:max-h-none md:h-full overflow-hidden bg-[#161b26] border-b md:border-b-0 md:border-r border-slate-700/70 flex flex-col z-30 shrink-0 shadow-2xl">
         <div class="p-4 md:p-5 flex items-center justify-between border-b border-slate-700/60 bg-[#181e2b]">
             <a href="/" class="flex items-center gap-3 hover:opacity-90 transition-all active:scale-95 group">
                 <div class="w-11 h-11 rounded-xl bg-white shadow-md p-1 border border-white/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform overflow-hidden">
@@ -238,12 +225,9 @@
     </aside>
 
     <!-- MAIN CONTENT -->
-    <main class="flex-1 flex flex-col h-full relative overflow-hidden">
-        <!-- Main body shadow overlay when sidebar is open -->
-        <div id="mainOverlayShadow" class="cursor-pointer" title="Click to close sidebar"></div>
-
-        <!-- Open sidebar button (visible on load) -->
-        <button id="sidebarOpenBtn" class="fixed top-4 left-4 z-30 w-9 h-9 rounded-xl bg-surface-elevated/90 backdrop-blur border border-surface-border shadow-lg flex items-center justify-center text-gray-300 hover:text-white hover:border-primary-500 transition-all opacity-100 scale-100 pointer-events-auto md:top-5 md:left-5">
+    <main class="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+        <!-- Open sidebar button (visible when sidebar is collapsed) -->
+        <button id="sidebarOpenBtn" class="fixed top-4 left-4 z-30 w-9 h-9 rounded-xl bg-surface-elevated/90 backdrop-blur border border-surface-border shadow-lg flex items-center justify-center text-gray-300 hover:text-white hover:border-primary-500 transition-all opacity-0 scale-90 pointer-events-none md:top-5 md:left-5">
             <i class="fas fa-bars text-sm"></i>
         </button>
 
@@ -317,6 +301,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="meshopt_decoder.js"></script>
     <script src="avatar.js"></script>
     <script>
         const avatarCanvas = document.getElementById('avatarCanvas');
@@ -377,7 +362,6 @@
             textarea.value = cur + (cur ? ' ' : '') + word;
             textarea.dispatchEvent(new Event('input'));
             textarea.focus();
-            if (typeof closeSidebar === 'function') closeSidebar();
         }
 
         function escapeHtml(str) { return str.replace(/[&<>]/g, function(m){ if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; return m; }); }
@@ -408,7 +392,6 @@
                     textarea.value = item.text;
                     textarea.dispatchEvent(new Event('input'));
                     translateText();
-                    if (typeof closeSidebar === 'function') closeSidebar();
                 });
             });
         }
@@ -557,7 +540,6 @@
         function initSidebar() {
             const closeSide = document.getElementById('sidebarCloseBtn');
             const openSide = document.getElementById('sidebarOpenBtn');
-            const mainShadow = document.getElementById('mainOverlayShadow');
 
             openSidebar = function() {
                 document.body.classList.remove('sidebar-collapsed');
@@ -575,10 +557,9 @@
 
             closeSide.onclick = closeSidebar;
             openSide.onclick = openSidebar;
-            if (mainShadow) mainShadow.onclick = closeSidebar;
 
-            // Start with sidebar collapsed so the main body/avatar is open on load
-            closeSidebar();
+            // Sidebar is part of the page body and visible by default
+            openSidebar();
         }
 
         // ── Voice input (Cross-Browser & Microsoft Edge Compatible) ────────

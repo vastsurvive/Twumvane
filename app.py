@@ -2,10 +2,13 @@
 TWUMVANE - Rwanda Sign Language Avatar Platform
 Serves the 3D avatar sign-language translator on http://localhost:5000
 """
+import gzip
 import os
 import mimetypes
+import shutil
 
-from flask import Flask, render_template, send_from_directory, redirect
+from flask import Flask, render_template, send_from_directory, send_file, redirect, request, abort
+from werkzeug.utils import safe_join
 
 # Register GLTF/GLB mimetypes to ensure proper content-type headers across all browsers
 mimetypes.add_type('model/gltf-binary', '.glb')
@@ -26,6 +29,41 @@ try:
         shutil.copy2(src_logo, dst_logo)
 except Exception as e:
     pass
+
+
+def _ensure_gzip(path):
+    """Return a gzip-compressed copy of path, creating it if missing or stale."""
+    gz_path = path + '.gz'
+    try:
+        if not os.path.exists(gz_path) or os.path.getmtime(gz_path) < os.path.getmtime(path):
+            tmp_path = gz_path + '.tmp'
+            with open(path, 'rb') as src, gzip.open(tmp_path, 'wb', compresslevel=9) as dst:
+                shutil.copyfileobj(src, dst, length=1024 * 1024)
+            os.replace(tmp_path, gz_path)
+        return gz_path
+    except OSError:
+        return None
+
+
+def _serve_static(directory, filename):
+    """Serve a file, using gzip and long-lived caching for the avatar model."""
+    path = safe_join(directory, filename)
+    if path is None:
+        abort(404)
+
+    if filename.lower().endswith('.glb') and os.path.isfile(path):
+        accepts_gzip = 'gzip' in request.headers.get('Accept-Encoding', '').lower()
+        gz_path = _ensure_gzip(path) if accepts_gzip else None
+        if gz_path:
+            resp = send_file(gz_path, mimetype='model/gltf-binary', conditional=True, etag=True)
+            resp.headers['Content-Encoding'] = 'gzip'
+        else:
+            resp = send_file(path, mimetype='model/gltf-binary', conditional=True, etag=True)
+        resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        resp.headers['Vary'] = 'Accept-Encoding'
+        return resp
+
+    return send_from_directory(directory, filename)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -64,7 +102,7 @@ def trsl_index():
 @app.route('/trsl/<path:filename>')
 def trsl_static(filename):
     """Serve static assets (avatar.js, models, logo.jpg, etc.)."""
-    return send_from_directory(TRSL_FRONTEND, filename)
+    return _serve_static(TRSL_FRONTEND, filename)
 
 
 # Fallback routes in case a browser requests relative paths from root /
@@ -75,13 +113,15 @@ def root_avatar_js():
 
 @app.route('/models/<path:filename>')
 def root_models(filename):
-    return send_from_directory(os.path.join(TRSL_FRONTEND, 'models'), filename)
+    return _serve_static(os.path.join(TRSL_FRONTEND, 'models'), filename)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 #  Main entry point
 # ──────────────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
+    _ensure_gzip(os.path.join(TRSL_FRONTEND, 'models', 'twumvane.glb'))
+
     print()
     print("=" * 65)
     print("  ---  TWUMVANE - Rwanda Sign Language Avatar Platform")
