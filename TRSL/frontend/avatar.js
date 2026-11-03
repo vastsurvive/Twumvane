@@ -324,7 +324,7 @@ const AvatarPlayer = (function () {
     let playbackSpeed = 1;
     let avatarRoot = null;
     const armRests = [];
-    const DOWN = new THREE.Vector3(0, -1, 0);
+    const ARM_OUTWARD = 0.16;
 
     function captureRestPose() {
         armRests.length = 0;
@@ -336,6 +336,7 @@ const AvatarPlayer = (function () {
             if (!child) return;
             armRests.push({
                 bone,
+                outward: name === 'LeftArm' ? 1 : -1,
                 offset: child.position.clone(),
                 local: bone.quaternion.clone()
             });
@@ -348,13 +349,15 @@ const AvatarPlayer = (function () {
         const parentWorld = new THREE.Quaternion();
         const boneWorld = new THREE.Quaternion();
         const dir = new THREE.Vector3();
+        const target = new THREE.Vector3();
         const delta = new THREE.Quaternion();
         armRests.forEach((arm) => {
             arm.bone.quaternion.copy(arm.local);
             arm.bone.updateMatrixWorld(true);
             arm.bone.getWorldQuaternion(boneWorld);
             dir.copy(arm.offset).applyQuaternion(boneWorld).normalize();
-            delta.setFromUnitVectors(dir, DOWN);
+            target.set(arm.outward * ARM_OUTWARD, -1, 0).normalize();
+            delta.setFromUnitVectors(dir, target);
             arm.bone.parent.getWorldQuaternion(parentWorld);
             const newLocal = parentWorld.clone().invert()
                 .multiply(delta)
@@ -574,7 +577,11 @@ const AvatarPlayer = (function () {
 
     function stop() {
         pendingWord = null;
-        if (currentAction) currentAction.stop();
+        if (currentAction) {
+            currentAction.stop();
+            currentAction = null;
+        }
+        applyRestPose();
     }
 
     return { init, has, playWord, stop, setSpeed };
